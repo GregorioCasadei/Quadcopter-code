@@ -129,6 +129,11 @@ MPU6050 mpu;
 // format used for the InvenSense teapot demo
 //#define OUTPUT_TEAPOT
 
+#define PITCH_MAX_MOTOR_BALANCE_SPEED 7 //spinta massima per bilanciare questo asse
+#define ROLL_MAX_MOTOR_BALANCE_SPEED 7 //spinta massima per bilanciare questo asse
+#define ROLL_PID_OUTPUT 20
+#define PITCH_PID_OUTPUT 20
+
 #define LED_PIN 13 // (Arduino is 13, Teensy is 11, Teensy++ is 6)
 bool blinkState = false;
 
@@ -212,15 +217,19 @@ int val_speed2 = speed + quad_var.speed_var.SPEED_DEFAULT_DC;
 
 //PID vars
 double SetpointX, InputX, OutputX;
-double Kxp=5, Kxi=0.0, Kxd=0.0;
+#define Kxp 0.201f
+#define Kxi 0.040f
+#define Kxd 0.108f
 //double Kxp=28, Kxi=0.130, Kxd=70;
 
 double SetpointY, InputY, OutputY;
-double Kyp=5, Kyi=0.0, Kyd=0.0;
+#define Kyp 0.201f
+#define Kyi 0.040f
+#define Kyd 0.108f
 //double Kyp=28, Kyi=0.130, Kyd=70;
 
-PID pidX(&InputX, &OutputX, &SetpointX, Kxp, Kxi, Kxd, REVERSE);
-PID pidY(&InputY, &OutputY, &SetpointY, Kyp, Kyi, Kyd, REVERSE);
+PID pidX(&InputX, &OutputX, &SetpointX, Kxp, Kxi, Kxd, DIRECT);
+PID pidY(&InputY, &OutputY, &SetpointY, Kyp, Kyi, Kyd, DIRECT);
 
 // packet structure for InvenSense teapot demo
 uint8_t teapotPacket[14] = { '$', 0x02, 0,0, 0,0, 0,0, 0,0, 0x00, 0x00, '\r', '\n' };
@@ -582,77 +591,29 @@ void Stabilizer() {
   InputX = xyz.x;
   InputY = xyz.y;
   
-  pidY.Compute();
-  pidX.Compute();
-  
-  if(xyz.y < xyz.p_y) {
-  	Speed[0] = speed + quad_var.speed_var.SPEED_DEFAULT_DC;
-  	Speed[2] = speed + quad_var.speed_var.SPEED_DEFAULT_DC;
+  if(pidY.Compute()) {
+  	OutputY /= PITCH_PID_OUTPUT;
   	
-  	Speed[1] = speed - quad_var.speed_var.SPEED_DEFAULT_DC;
-  	Speed[3] = speed - quad_var.speed_var.SPEED_DEFAULT_DC;
-  	
-  	for(int i = 0; i < 4; i++) {
-  		if(Speed[i] < quad_var.speed_var.StartSpeedVal) {
-  			Speed[i] += quad_var.speed_var.SPEED_DEFAULT_DC;
-  		}else if(Speed[i] > quad_var.speed_var.FinishSpeedVal) {
-  			Speed[i] -= quad_var.speed_var.SPEED_DEFAULT_DC;
-  		}
-  	}
-  	SpeedSwitch(Speed[0], Speed[1], Speed[2], Speed[3], 1);
+  	m1.write(speed+(OutputY*PITCH_MAX_MOTOR_BALANCE_SPEED));
+  	m4.write(speed-(OutputY*PITCH_MAX_MOTOR_BALANCE_SPEED));
   }
   
-  if(xyz.y > xyz.p_y) {
-  	Speed[0] = speed - quad_var.speed_var.SPEED_DEFAULT_DC;
-  	Speed[2] = speed - quad_var.speed_var.SPEED_DEFAULT_DC;
+  if(pidX.Compute()) {
+  	OutputX /= ROLL_PID_OUTPUT;
   	
-  	Speed[1] = speed + quad_var.speed_var.SPEED_DEFAULT_DC;
-  	Speed[3] = speed + quad_var.speed_var.SPEED_DEFAULT_DC;
-  	
-  	for(int i = 0; i < 4; i++) {
-  		if(Speed[i] < quad_var.speed_var.StartSpeedVal) {
-  			Speed[i] += quad_var.speed_var.SPEED_DEFAULT_DC;
-  		}else if(Speed[i] > quad_var.speed_var.FinishSpeedVal) {
-  			Speed[i] -= quad_var.speed_var.SPEED_DEFAULT_DC;
-  		}
-  	}
-  	SpeedSwitch(Speed[0], Speed[1], Speed[2], Speed[3], 1);
+  	m3.write(speed+(OutputX*ROLL_MAX_MOTOR_BALANCE_SPEED));
+  	m2.write(speed-(OutputX*ROLL_MAX_MOTOR_BALANCE_SPEED));
   }
   
-  if(xyz.x > xyz.p_x) {
-  	Speed[0] = speed - quad_var.speed_var.SPEED_DEFAULT_DC;
-  	Speed[1] = speed - quad_var.speed_var.SPEED_DEFAULT_DC;
-  	
-  	Speed[2] = speed + quad_var.speed_var.SPEED_DEFAULT_DC;
-  	Speed[3] = speed + quad_var.speed_var.SPEED_DEFAULT_DC;
-  	
-  	for(int i = 0; i < 4; i++) {
-  		if(Speed[i] < quad_var.speed_var.StartSpeedVal) {
-  			Speed[i] += quad_var.speed_var.SPEED_DEFAULT_DC;
-  		}else if(Speed[i] > quad_var.speed_var.FinishSpeedVal) {
-  			Speed[i] -= quad_var.speed_var.SPEED_DEFAULT_DC;
-  		}
-  	}
-  	SpeedSwitch(Speed[0], Speed[1], Speed[2], Speed[3], 1);
-  }
-  
-  if(xyz.x > xyz.p_x) {
-  	Speed[0] = speed + quad_var.speed_var.SPEED_DEFAULT_DC;
-  	Speed[1] = speed + quad_var.speed_var.SPEED_DEFAULT_DC;
-  	
-  	Speed[2] = speed - quad_var.speed_var.SPEED_DEFAULT_DC;
-  	Speed[3] = speed - quad_var.speed_var.SPEED_DEFAULT_DC;
-  	
-  	for(int i = 0; i < 4; i++) {
-  		if(Speed[i] < quad_var.speed_var.StartSpeedVal) {
-  			Speed[i] += quad_var.speed_var.SPEED_DEFAULT_DC;
-  		}else if(Speed[i] > quad_var.speed_var.FinishSpeedVal) {
-  			Speed[i] -= quad_var.speed_var.SPEED_DEFAULT_DC;
-  		}
-  	}
-  	SpeedSwitch(Speed[0], Speed[1], Speed[2], Speed[3], 1);
-  }
-  
+  /*
+  if(yawReg.Compute()){
+    bal_axes /= YAW_PID_OUTPUT;
+    va -= bal_axes*YAW_MAX_MOTOR_BALANCE_SPEED;
+    vc -= bal_axes*YAW_MAX_MOTOR_BALANCE_SPEED;
+
+    vb += bal_axes*YAW_MAX_MOTOR_BALANCE_SPEED;
+    vd += bal_axes*YAW_MAX_MOTOR_BALANCE_SPEED;
+  }*/
   
 }
 
